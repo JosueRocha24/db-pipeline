@@ -16,6 +16,15 @@ pipeline {
     }
   
     stages {
+        stage('DB_PORT validation') {
+            steps {
+                script {
+                    // Validate if port is within valid range and if is not already being used by docker
+                    def validatedPort = validatePortNumber(params.MYSQL_PORT)
+                    echo "Validated port number: ${validatedPort}"
+                }
+            }
+        }
         stage('Checkout GIT repository') {
             steps {     
               script {
@@ -65,4 +74,26 @@ pipeline {
         }
     }
 
+}
+
+def validatePortNumber(value) {
+    try {
+        int port = Integer.parseInt(value)
+        if (port < 1024 || port > 65535) {
+            // throw new Exception("Port number must be between 1024 and 65535")
+            error("Port number must be between 1024 and 65535")
+        }
+
+        // Check if the port is already in use
+        def output = sh(script: "docker ps -a  | grep '${port}->' || true", returnStdout: true)
+        println "output: ${output}"
+        if (output != "" && output != "true") {
+            println "inside conditional"
+            error("Port is already in use, please choose another one")
+        }
+        println "after conditional"
+    } catch (NumberFormatException e) {
+        error("Port number must be a valid integer")
+    } 
+    return value
 }
