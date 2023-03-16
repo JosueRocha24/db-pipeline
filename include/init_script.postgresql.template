@@ -1,0 +1,19 @@
+CREATE DATABASE DEVAPP TEMPLATE template0;
+CREATE USER developer WITH ENCRYPTED PASSWORD '<PASSWORD>';
+GRANT ALL PRIVILEGES ON DATABASE DEVAPP TO developer;
+
+\c DEVAPP
+DROP TABLE IF EXISTS departments;
+
+-- Create the departments table
+CREATE TABLE departments (
+    DEPT INT,
+    DEPT_NAME VARCHAR(250)
+);
+
+-- Insert some demo data into the departments table
+INSERT INTO departments (DEPT, DEPT_NAME)
+VALUES (1001, 'IT'),
+       (1002, 'HR'),
+       (1003, 'Sales'),
+       (1003, 'Marketing');

@@ -9,8 +9,9 @@ pipeline {
 
     parameters {
         string name: 'ENVIRONMENT_NAME', trim: true     
-        password defaultValue: '', description: 'Password to use for MySQL container - root user', name: 'MYSQL_PASSWORD'
-        string name: 'MYSQL_PORT', trim: true  
+        password defaultValue: '', description: 'Password to use for DB container - root user', name: 'DB_PASSWORD'
+        string name: 'DB_PORT', trim: true, description: 'DB port (must be between 1024 and 65535)'
+        choice(name: 'DB_ENGINE', choices: ['MySQL', 'PostgreSQL'], description: 'Choose the database engine')
 
         booleanParam(name: 'SKIP_STEP_1', defaultValue: false, description: 'STEP 1 - RE-CREATE DOCKER IMAGE')
     }
@@ -20,7 +21,7 @@ pipeline {
             steps {
                 script {
                     // Validate if port is within valid range and if is not already being used by docker
-                    def validatedPort = validatePortNumber(params.MYSQL_PORT)
+                    def validatedPort = validatePortNumber(params.DB_PORT)
                     echo "Validated port number: ${validatedPort}"
                 }
             }
@@ -37,13 +38,13 @@ pipeline {
             steps {     
               script {
                 if (!params.SKIP_STEP_1){    
-                    echo "Creating docker image with name $params.ENVIRONMENT_NAME using port: $params.MYSQL_PORT"
+                    echo "Creating docker image with name $params.ENVIRONMENT_NAME using port: $params.DB_PORT"
                     sh """
-                    sed 's/<PASSWORD>/$params.MYSQL_PASSWORD/g' include/init_script.template > include/init_script.sql
+                    sed 's/<PASSWORD>/$params.DB_PASSWORD/g' include/init_script.${params.DB_ENGINE.toLowerCase()}.template > include/init_script.sql
                     """
 
                     sh """
-                    docker build . -t $params.ENVIRONMENT_NAME:latest
+                    docker build . -f "Dockerfile.${params.DB_ENGINE.toLowerCase()}"  -t $params.ENVIRONMENT_NAME:latest
                     """
 
                 }else{
@@ -58,14 +59,18 @@ pipeline {
                 
                 def dateTime = (sh(script: "date +%Y%m%d%H%M%S", returnStdout: true).trim())
                 def containerName = "${params.ENVIRONMENT_NAME}_${dateTime}"
-                sh """
-                docker run -itd --name ${containerName} --rm -e MYSQL_ROOT_PASSWORD=$params.MYSQL_PASSWORD -p $params.MYSQL_PORT:3306 $params.ENVIRONMENT_NAME:latest
-                """
 
-                sh """
-                # A test server is temporarily spun up while running docker-entrypoint.sh and during this time the root user is only accessible with no credential, so we wait for it for the definitive startup
-                docker exec ${containerName} /bin/bash -c 'until mysql --user="root" --password="$params.MYSQL_PASSWORD" -e "SELECT 1;"; do sleep 5; done; mysql --user="root" --password="$params.MYSQL_PASSWORD" < /scripts/init_script.sql'
-                """
+                if (params.DB_ENGINE == "MySQL") {
+                    sh """
+                    docker run -itd --name ${containerName} --rm -e MYSQL_ROOT_PASSWORD=$params.DB_PASSWORD -p $params.DB_PORT:3306 $params.ENVIRONMENT_NAME:latest
+                    docker exec ${containerName} /bin/bash -c 'until mysql -s --user="root" --password="$params.DB_PASSWORD" -e "SELECT 1;"; do sleep 5; done; mysql --user="root" --password="$DB_PASSWORD" < /scripts/init_script.sql'
+                    """
+                } else if (params.DB_ENGINE == "PostgreSQL") {
+                    sh """
+                    docker run -itd --name ${containerName} --rm -e POSTGRES_PASSWORD=$params.DB_PASSWORD -p $params.DB_PORT:5432 $params.ENVIRONMENT_NAME:latest
+                    docker exec ${containerName} /bin/bash -c 'until PGPASSWORD="$params.DB_PASSWORD" psql --username=postgres -c "SELECT 1 AS result;"; do sleep 5; done; PGPASSWORD="$params.DB_PASSWORD" psql --username=postgres < /scripts/init_script.sql'
+                    """
+                }
 
                 echo "Docker container created: $containerName"
 
