@@ -20,8 +20,7 @@ pipeline {
             steps {     
               script {
                 git branch: 'master',
-                credentialsId: '21f01d09-06da9cc35103',
-                url: 'git@mysecret-nonexistent-repo/jenkins.git'
+                url: 'https://github.com/JosueRocha24/db-pipeline'
               }
             }
         }
@@ -31,11 +30,11 @@ pipeline {
                 if (!params.SKIP_STEP_1){    
                     echo "Creating docker image with name $params.ENVIRONMENT_NAME using port: $params.MYSQL_PORT"
                     sh """
-                    sed 's/<PASSWORD>/$params.MYSQL_PASSWORD/g' pipelines/include/create_developer.template > pipelines/include/create_developer.sql
+                    sed 's/<PASSWORD>/$params.MYSQL_PASSWORD/g' include/create_developer.template > include/create_developer.sql
                     """
 
                     sh """
-                    docker build pipelines/ -t $params.ENVIRONMENT_NAME:latest
+                    docker build . -t $params.ENVIRONMENT_NAME:latest
                     """
 
                 }else{
@@ -55,7 +54,8 @@ pipeline {
                 """
 
                 sh """
-                docker exec ${containerName} /bin/bash -c 'mysql --user="root" --password="$params.MYSQL_PASSWORD" < /scripts/create_developer.sql'
+                # A test server is temporarily spun up while running docker-entrypoint.sh and during this time the root user is only accessible with no credential, so we wait for it for the definitive startup
+                docker exec ${containerName} /bin/bash -c 'until mysql --user="root" --password="$params.MYSQL_PASSWORD" -e "SELECT 1;"; do sleep 5; done; mysql --user="root" --password="$params.MYSQL_PASSWORD" < /scripts/create_developer.sql'
                 """
 
                 echo "Docker container created: $containerName"
