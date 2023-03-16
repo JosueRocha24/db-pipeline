@@ -1,0 +1,20 @@
+CREATE DATABASE DEVAPP;
+CREATE USER 'developer'@'localhost' IDENTIFIED BY '<PASSWORD>';
+GRANT CREATE, ALTER, DROP, INSERT, UPDATE, DELETE, SELECT, REFERENCES, RELOAD on *.* TO 'developer'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+
+USE DEVAPP;
+DROP TABLE IF EXISTS departments;
+
+-- Create the departments table
+CREATE TABLE departments (
+    DEPT INT(4),
+    DEPT_NAME VARCHAR(250)
+);
+
+-- Insert some demo data into the departments table
+INSERT INTO departments (DEPT, DEPT_NAME)
+VALUES (1001, 'IT'),
+       (1002, 'HR'),
+       (1003, 'Sales'),
+       (1003, 'Marketing');

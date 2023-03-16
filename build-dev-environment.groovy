@@ -39,7 +39,7 @@ pipeline {
                 if (!params.SKIP_STEP_1){    
                     echo "Creating docker image with name $params.ENVIRONMENT_NAME using port: $params.MYSQL_PORT"
                     sh """
-                    sed 's/<PASSWORD>/$params.MYSQL_PASSWORD/g' include/create_developer.template > include/create_developer.sql
+                    sed 's/<PASSWORD>/$params.MYSQL_PASSWORD/g' include/init_script.template > include/init_script.sql
                     """
 
                     sh """
@@ -64,7 +64,7 @@ pipeline {
 
                 sh """
                 # A test server is temporarily spun up while running docker-entrypoint.sh and during this time the root user is only accessible with no credential, so we wait for it for the definitive startup
-                docker exec ${containerName} /bin/bash -c 'until mysql --user="root" --password="$params.MYSQL_PASSWORD" -e "SELECT 1;"; do sleep 5; done; mysql --user="root" --password="$params.MYSQL_PASSWORD" < /scripts/create_developer.sql'
+                docker exec ${containerName} /bin/bash -c 'until mysql --user="root" --password="$params.MYSQL_PASSWORD" -e "SELECT 1;"; do sleep 5; done; mysql --user="root" --password="$params.MYSQL_PASSWORD" < /scripts/init_script.sql'
                 """
 
                 echo "Docker container created: $containerName"
